@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/BCCD_Dataset/
+results/cache/
+.ipynb_checkpoints/

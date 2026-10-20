@@ -1,0 +1,15 @@
+{
+ "raw_boxes": 4888,
+ "class_name_fixed": 0,
+ "dropped_unknown_class": 0,
+ "unknown_class_names": [],
+ "dropped_missing_image": 0,
+ "clipped_to_image": 0,
+ "dropped_zero_or_negative_size": 2,
+ "dropped_exact_duplicates": 0,
+ "dropped_near_duplicates_iou_gt_0.9": 7,
+ "clean_boxes": 4879,
+ "n_jpegs": 364,
+ "n_xmls": 364,
+ "images_without_boxes": []
+}

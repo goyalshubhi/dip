@@ -1,0 +1,5 @@
+split,images,boxes,n_RBC,images_with_RBC,n_WBC,images_with_WBC,n_Platelets,images_with_Platelets,boxes_per_image_mean,boxes_per_image_median,boxes_per_image_min,boxes_per_image_max
+train,205,2800,2377,197,214,204,209,117,13.659,14.0,1,28
+val,87,1135,965,83,87,86,83,45,13.046,13.0,1,30
+test,72,944,804,69,71,68,69,39,13.111,13.0,1,24
+all,364,4879,4146,349,372,358,361,201,13.404,13.5,1,30
