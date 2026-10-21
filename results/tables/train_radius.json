@@ -1,0 +1,11 @@
+{
+ "fallback_r": 41.544189453125,
+ "n_images": 205,
+ "n_isolated_cells": 432,
+ "n_images_with_enough_isolated": 148,
+ "per_image_r_p5_p50_p95": [
+  33.23,
+  41.26,
+  47.49
+ ]
+}
