@@ -1,0 +1,29 @@
+14:22:51 INFO Test segmentation comparison (72 images; precision is a lower bound, BCCD under-annotates RBCs):
+                                 0                1                2                   3
+method                  otsu_morph  watershed_plain  watershed_fixed  watershed_adaptive
+images                          72               72               72                  72
+precision@0.5                0.728            0.032            0.646                0.63
+recall@0.5                   0.354            0.374            0.652               0.659
+f1@0.5                       0.476            0.058            0.649               0.644
+tp@0.5                         251              265              462                 467
+fp@0.5                          94             8129              253                 274
+fn@0.5                         458              444              247                 242
+recall_RBC@0.5               0.273            0.296            0.625               0.634
+recall_WBC@0.5                 0.9              0.9              0.9                 0.9
+recall_Platelets@0.5         0.705            0.705            0.705               0.705
+precision@0.3                 0.84            0.063            0.733               0.718
+recall@0.3                   0.408             0.74            0.733               0.743
+f1@0.3                       0.549            0.116            0.733                0.73
+tp@0.3                         289              525              520                 527
+fp@0.3                          55             7807              189                 207
+fn@0.3                         420              184              189                 182
+recall_RBC@0.3               0.333            0.727            0.719               0.731
+recall_WBC@0.3                 0.9              0.9              0.9                 0.9
+recall_Platelets@0.3         0.738            0.738            0.738               0.738
+count_mae_RBC                5.264          107.319            2.514               2.597
+count_mae_WBC                0.111            0.111            0.111               0.111
+count_mae_Platelets          0.431            0.431            0.431               0.431
+count_mae_overall            5.389          107.333            2.806               2.917
+pred_regions_per_image       4.931          117.181           10.208              10.597
+gt_boxes_per_image           9.847            9.847            9.847               9.847
+14:22:51 INFO step_test done in 26 s

@@ -3,7 +3,7 @@
 ## Status
 - [x] Phase 1: env, download, loader, stats, box overlays
 - [x] Phase 2: preprocess + 4 segmenters + visual check
-- [ ] Phase 3: matching, tuning on train/val, segmentation eval on test
+- [x] Phase 3: matching, tuning on train/val, segmentation eval on test
 - [ ] Phase 4: features + classifiers (GT crops, segmented regions)
 - [ ] Phase 5: interpretability + sensitivity + final figures
 - [ ] Phase 6: run_all.sh, notebook, README
@@ -43,15 +43,49 @@
   min_distance 20 over-splits; otsu_morph merges clumps.
 - `tests/test_segment.py` (synthetic smears): 16/16 tests pass with `tests/test_loader.py`.
 
+## Phase 3 (done)
+- `src/match.py`: IoU matrix, Hungarian matching (max #matches at IoU >= thr, then total IoU),
+  per-image scoring with border handling (border regions dropped; border GT boxes are
+  "don't care"). `src/evaluate.py`: per-image counts, micro P/R/F1 at IoU 0.5 and 0.3,
+  per-class recall, per-class and overall count MAE, and the train/val tuning grids.
+- `scripts/run_segmentation_eval.py --steps tune,test` -> `results/tables/seg_tuning_shared.csv`,
+  `results/tables/seg_tuning_splitting.csv`, `results/tables/segmentation_val.csv`,
+  `results/tables/seg_params.json`, `results/tables/segmentation_comparison.csv`,
+  `results/tables/segmentation_test_per_image.csv`; figure `results/figures/segmentation_grid_test.png`.
+- Tuned on train (val as check; `results/logs/seg_tune.log`): wbc_dilate 15, plt_min_area 250,
+  plt_dilate 9, rbc_min_area 4000; fixed min_distance 36 (train F1 0.663, val 0.670); adaptive
+  k1 0.7, k2 0.01 (train F1 0.661, val 0.669). Best method on val: watershed_fixed.
+- Test split, 72 images, each method run once (`results/tables/segmentation_comparison.csv`;
+  precision is a lower bound because BCCD under-annotates RBCs):
+
+  | method | P@0.5 | R@0.5 | F1@0.5 | F1@0.3 | RBC count MAE | overall count MAE |
+  |---|---|---|---|---|---|---|
+  | otsu_morph | 0.728 | 0.354 | 0.476 | 0.549 | 5.264 | 5.389 |
+  | watershed_plain | 0.032 | 0.374 | 0.058 | 0.116 | 107.319 | 107.333 |
+  | watershed_fixed | 0.646 | 0.652 | 0.649 | 0.733 | 2.514 | 2.806 |
+  | watershed_adaptive | 0.630 | 0.659 | 0.644 | 0.730 | 2.597 | 2.917 |
+
+  WBC recall@0.5 0.900 and platelet recall@0.5 0.705 are identical for all methods (shared
+  stain path). On unscaled BCCD the adaptive watershed does **not** beat the fixed one
+  (F1 0.644 vs 0.649); 46 of 72 test images got a per-image radius, 26 used the training fallback
+  (`results/tables/segmentation_test_per_image.csv`).
+- Visual check (`segmentation_grid_test.png`): on the densest test cluster (BloodImage_00018,
+  21 GT RBCs) the methods give 2 / 177 / 19 / 19 RBC-like regions; plain over-segments every image.
+- 27 tests pass (`tests/test_loader.py`, `test_segment.py`, `test_match.py`, `test_features.py`).
+
 ## Next
-Phase 3: box matching (Hungarian, IoU 0.5 / 0.3), tuning of min_distance, k1, k2 (and the
-platelet area cutoff / dilations) on train with val as a check, then test evaluation.
+Phase 4: 22 features, four classifiers, GT-crop and end-to-end settings
+(`scripts/run_classification.py`, end-to-end with watershed_fixed, the best method on val).
 
 ## Open issues
 - On unscaled BCCD the per-image radius estimate barely varies with true cell size
   (magnification is constant), so adaptive is not expected to beat fixed on plain BCCD;
   any advantage should show up only under rescaling (Evaluation D).
-- With default parameters platelets are over-detected on train (400 predicted vs 209 GT,
-  `results/tables/segmentation_design_checks.csv`);
-  to be addressed by tuning the platelet cutoffs on train in Phase 3.
+- With default parameters platelets were over-detected on train (400 predicted vs 209 GT,
+  `results/tables/segmentation_design_checks.csv`); tuning raised plt_min_area to 250.
+- An eosinophil with two large nuclear lobes is split into two WBC regions by the
+  "two nucleus-sized blobs = two WBCs" rule (seen on test image BloodImage_00253 in
+  `segmentation_grid_test.png`). Not fixed, because changing the segmenter after the test
+  run would mean evaluating on test twice.
+- A 12-worker tuning run was killed by the OS for low memory; scripts now default to 4 workers.
 - Pale-centred RBCs whose rim has a wide gap, or that touch the border, stay ring/C-shaped.

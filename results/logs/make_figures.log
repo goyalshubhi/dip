@@ -1,14 +1,1 @@
-13:02:12 INFO saved segmentation_check_train.png for ['BloodImage_00036', 'BloodImage_00039', 'BloodImage_00082', 'BloodImage_00176', 'BloodImage_00177', 'BloodImage_00263', 'BloodImage_00281', 'BloodImage_00301', 'BloodImage_00345', 'BloodImage_00038']
-13:02:12 INFO region counts (default params, train images):
-method            otsu_morph  watershed_adaptive  watershed_fixed  watershed_plain
-image                                                                             
-BloodImage_00036        10.0                17.0             29.0            162.0
-BloodImage_00038         5.0                16.0             32.0            200.0
-BloodImage_00039         7.0                13.0             20.0            186.0
-BloodImage_00082         5.0                13.0             22.0            138.0
-BloodImage_00176        17.0                19.0             30.0            126.0
-BloodImage_00177        18.0                20.0             22.0            140.0
-BloodImage_00263         9.0                15.0             23.0            151.0
-BloodImage_00281        17.0                17.0             26.0             79.0
-BloodImage_00301        15.0                21.0             24.0            119.0
-BloodImage_00345        18.0                20.0             31.0            148.0
+14:23:49 INFO saved segmentation_grid_test.png for ['BloodImage_00018', 'BloodImage_00075', 'BloodImage_00149', 'BloodImage_00253'] (densest: BloodImage_00018)

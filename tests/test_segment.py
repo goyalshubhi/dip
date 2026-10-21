@@ -58,6 +58,14 @@ def test_touching_cells_split_by_watershed_not_by_otsu():
     assert _n(S.segment(rgb, "watershed_plain")) >= 2
 
 
+def test_adaptive_without_dome_test_still_splits_pair():
+    img = _canvas()
+    _disk(img, 120, 120, 40, RBC_COLOR)
+    _disk(img, 120, 190, 40, RBC_COLOR)
+    seg = S.segment(_finish(img), "watershed_adaptive", fallback_r=40.0, k1=0.8, k2=0.0)
+    assert _n(seg) == 2
+
+
 def test_pale_centre_is_filled():
     img = _canvas()
     _disk(img, 120, 160, 45, RBC_COLOR)

@@ -5,6 +5,7 @@ Usage: python scripts/make_figures.py [--only preprocess,seg_train]
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -91,7 +92,107 @@ def fig_seg_train(logger, n: int = 10) -> None:
                 pd.DataFrame(rows).pivot_table(index="image", columns="method", values=S.RBC).to_string())
 
 
-FIGURES = {"preprocess": fig_preprocess, "seg_train": fig_seg_train}
+def tuned_params() -> dict:
+    with open(TABLE_DIR / "seg_params.json", encoding="utf-8") as f:
+        return json.load(f)["params"]
+
+
+def fig_seg_test(logger) -> None:
+    """Original | four methods with tuned parameters on 4 test images, incl. the densest RBC cluster."""
+    params = tuned_params()
+    splits = load_splits()
+    df = pd.read_csv(TABLE_DIR / "annotations_clean.csv")
+    rbc_counts = df[(df["class"] == "RBC") & df["image"].isin(splits["test"])].groupby("image").size()
+    densest = rbc_counts.idxmax()
+    rng = np.random.default_rng(SEED)
+    others = [i for i in rng.permutation(splits["test"]).tolist() if i != densest][:3]
+    ids = [densest] + sorted(others)
+    fig, axes = plt.subplots(len(ids), 5, figsize=(20, 3.2 * len(ids)))
+    for row, image_id in zip(axes, ids):
+        rgb = load_image(image_id)
+        prep = S.prepare(rgb, **params)
+        gt = df[df["image"] == image_id]
+        tag = " (densest RBC cluster)" if image_id == densest else ""
+        row[0].imshow(draw_boxes(rgb, gt, label=False))
+        row[0].set_title(f"{image_id}{tag}\nGT R/W/P = {(gt['class'] == 'RBC').sum()}/"
+                         f"{(gt['class'] == 'WBC').sum()}/{(gt['class'] == 'Platelets').sum()}", fontsize=9)
+        for ax, method in zip(row[1:], S.METHODS):
+            seg = S.segment_prepared(prep, method, **params)
+            counts = {k: sum(v == k for v in seg.types.values()) for k in TYPE_COLORS}
+            ax.imshow(overlay(rgb, seg))
+            ax.set_title(f"{method}\nregions R/W/P = {counts[S.RBC]}/{counts[S.WBC]}/{counts[S.PLATELET]}", fontsize=9)
+        for ax in row:
+            ax.axis("off")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "segmentation_grid_test.png", dpi=80)
+    plt.close(fig)
+    logger.info("saved segmentation_grid_test.png for %s (densest: %s)", ids, densest)
+
+
+METHOD_STYLE = {"watershed_fixed": ("#7a7a7a", "s", "fixed"), "watershed_adaptive": ("#d1495b", "o", "adaptive")}
+
+
+def fig_sensitivity(logger) -> None:
+    """F1 and RBC count MAE of fixed vs adaptive watershed under rescaling and colour shifts."""
+    tab = pd.read_csv(TABLE_DIR / "sensitivity.csv")
+    base = tab[tab["condition"] == "original"].copy()
+    panels = [("scale", "image scale", [0.7, 1.0, 1.3]), ("hue", "hue shift (deg)", [-10, 0, 10]),
+              ("brightness", "brightness factor", [0.8, 1.0, 1.2])]
+    metrics = [("f1@0.5", "F1 @ IoU 0.5"), ("count_mae_RBC", "RBC count MAE / image")]
+    fig, axes = plt.subplots(len(metrics), len(panels), figsize=(13, 7), sharey="row")
+    for j, (kind, xlabel, xs) in enumerate(panels):
+        sub = tab[tab["kind"] == kind]
+        neutral = 0 if kind == "hue" else 1.0
+        for method, (color, marker, label) in METHOD_STYLE.items():
+            rows = pd.concat([sub[sub["method"] == method], base[base["method"] == method].assign(value=neutral)])
+            rows = rows.drop_duplicates("value").sort_values("value")
+            for i, (col, ylabel) in enumerate(metrics):
+                ax = axes[i, j]
+                ax.plot(rows["value"], rows[col], marker=marker, color=color, label=label, lw=2)
+                ax.set_xticks(xs)
+                ax.set_xlabel(xlabel)
+                ax.set_ylabel(ylabel)
+                ax.grid(alpha=0.3)
+    axes[0, 0].legend(frameon=False)
+    fig.suptitle("Sensitivity on the test split (tuned on unperturbed train images; precision is a lower bound)")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "sensitivity.png", dpi=110)
+    plt.close(fig)
+    logger.info("saved sensitivity.png")
+
+
+def fig_importance(logger) -> None:
+    imp = pd.read_csv(TABLE_DIR / "permutation_importance.csv").sort_values("importance_mean")
+    fig, ax = plt.subplots(figsize=(7, 7))
+    ax.barh(imp["feature"], imp["importance_mean"], xerr=imp["importance_std"], color="#3a6ea5", ecolor="#999")
+    ax.axvline(0, color="k", lw=0.8)
+    ax.set_xlabel("drop in macro-F1 when the feature is permuted (test split, 20 repeats)")
+    ax.set_title(f"Permutation importance: {imp['model'].iloc[0]} on GT-box crops")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "permutation_importance.png", dpi=110)
+    plt.close(fig)
+    logger.info("saved permutation_importance.png")
+
+
+def fig_class_means(logger) -> None:
+    import seaborn as sns
+
+    tab = pd.read_csv(TABLE_DIR / "class_feature_means.csv")
+    z = tab[tab["stat"] == "z_mean"].set_index("class").drop(columns="stat")
+    fig, ax = plt.subplots(figsize=(14, 3.4))
+    lim = float(np.abs(z.to_numpy()).max())
+    sns.heatmap(z, cmap="RdBu_r", center=0, vmin=-lim, vmax=lim, annot=True, fmt=".1f", ax=ax,
+                cbar_kws={"label": "z-score vs all train+val crops"})
+    ax.set_title("Per-class mean of each feature (train+val GT-box crops, z-scored)")
+    ax.set_ylabel("")
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "class_feature_means.png", dpi=110)
+    plt.close(fig)
+    logger.info("saved class_feature_means.png")
+
+
+FIGURES = {"preprocess": fig_preprocess, "seg_train": fig_seg_train, "seg_test": fig_seg_test,
+           "sensitivity": fig_sensitivity, "importance": fig_importance, "class_means": fig_class_means}
 
 
 def main() -> None:

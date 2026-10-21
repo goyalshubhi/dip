@@ -121,19 +121,32 @@ def purple_objects(purple: np.ndarray, p: dict) -> tuple[list[np.ndarray], list[
         area = int(core.sum())
         if area < p["plt_min_area"]:
             continue
-        full = np.zeros_like(stain)
         if area >= p["wbc_min_area"]:
             for nucleus in _split_nuclei(core, p["wbc_min_area"]):
-                full[:] = False
-                full[r0:r1, c0:c1] = morphology.convex_hull_image(nucleus)
-                grown = cv2.dilate(full.astype(np.uint8), _disk(p["wbc_dilate"])) > 0
-                wbc_regions.append(grown)
+                hull = morphology.convex_hull_image(nucleus)
+                wbc_regions.append(_grow(hull, (r0, c0), stain.shape, p["wbc_dilate"], fill=False))
         else:
-            full[r0:r1, c0:c1] = core
-            plt_cores |= full
-            grown = cv2.dilate(full.astype(np.uint8), _disk(p["plt_dilate"])) > 0
-            plt_regions.append(ndi.binary_fill_holes(grown))
+            plt_cores[r0:r1, c0:c1] |= core
+            plt_regions.append(_grow(core, (r0, c0), stain.shape, p["plt_dilate"], fill=True))
     return wbc_regions, plt_regions, plt_cores
+
+
+def _grow(crop_mask: np.ndarray, origin: tuple[int, int], shape: tuple[int, int], radius: int,
+          fill: bool) -> np.ndarray:
+    """Dilate a mask given as a crop at origin; returns a full-size mask. Works on a padded crop."""
+    pad = int(radius) + 1
+    h, w = crop_mask.shape
+    canvas = np.zeros((h + 2 * pad, w + 2 * pad), np.uint8)
+    canvas[pad:pad + h, pad:pad + w] = crop_mask
+    grown = cv2.dilate(canvas, _disk(radius)) > 0
+    if fill:
+        grown = ndi.binary_fill_holes(grown)
+    out = np.zeros(shape, bool)
+    r0, c0 = origin[0] - pad, origin[1] - pad
+    rr0, cc0 = max(r0, 0), max(c0, 0)
+    rr1, cc1 = min(r0 + grown.shape[0], shape[0]), min(c0 + grown.shape[1], shape[1])
+    out[rr0:rr1, cc0:cc1] = grown[rr0 - r0:rr1 - r0, cc0 - c0:cc1 - c0]
+    return out
 
 
 def _split_nuclei(core: np.ndarray, wbc_min_area: int) -> list[np.ndarray]:
@@ -160,12 +173,17 @@ def prepare(rgb: np.ndarray, **params) -> Prepared:
     p = {**DEFAULTS, **params}
     pre = preprocess(rgb)
     fg, thr = foreground_mask(pre["normalized"], p["close_radius"], p["hole_close_radius"], p["open_radius"])
+    return assemble(pre, fg, thr, p)
+
+
+def assemble(pre: dict, fg: np.ndarray, thr: float, p: dict) -> Prepared:
+    """Stain path and RBC mask on top of a computed foreground (reused across tuning configs)."""
     wbc_regions, plt_regions, plt_cores = purple_objects(pre["purple"], p)
     rbc_mask = fg & ~plt_cores
     for w in wbc_regions:
         rbc_mask &= ~w
     rbc_mask = remove_small(rbc_mask, p["rbc_min_area"])
-    return Prepared(rgb.shape[:2], pre, fg, rbc_mask, wbc_regions, plt_regions, thr)
+    return Prepared(fg.shape, pre, fg, rbc_mask, wbc_regions, plt_regions, thr)
 
 
 def _ensure_marker_per_component(markers: np.ndarray, comp_labels: np.ndarray, dist: np.ndarray) -> np.ndarray:
@@ -287,15 +305,20 @@ def smooth_distance(dist: np.ndarray, r: float, sigma_frac: float) -> np.ndarray
     return ndi.gaussian_filter(dist, sigma=max(sigma_frac * r, 0.5))
 
 
-def dome_labels(smooth: np.ndarray, h: float) -> np.ndarray:
-    """Label the h-maxima of the smoothed distance transform: domes rising at least h."""
+def dome_labels(smooth: np.ndarray, h: float) -> np.ndarray | None:
+    """Label the h-maxima of the smoothed distance transform: domes rising at least h.
+
+    h <= 0 switches the dome test off (None).
+    """
+    if h <= 0:
+        return None
     return measure.label(morphology.h_maxima(smooth, h), connectivity=2)
 
 
-def adaptive_peaks(smooth: np.ndarray, comps: np.ndarray, min_distance: int, domes: np.ndarray) -> np.ndarray:
+def adaptive_peaks(smooth: np.ndarray, comps: np.ndarray, min_distance: int, domes: np.ndarray | None) -> np.ndarray:
     """Peaks at least min_distance apart that top an h-dome; the highest peak per dome wins."""
     peaks = peak_local_max(smooth, min_distance=min_distance, labels=comps, exclude_border=False)
-    if not len(peaks):
+    if not len(peaks) or domes is None:
         return peaks.reshape(-1, 2)
     dome_of_peak = domes[peaks[:, 0], peaks[:, 1]]
     kept, seen = [], set()
@@ -315,8 +338,13 @@ def marker_watershed(dist: np.ndarray, comps: np.ndarray, mask: np.ndarray, peak
 def segment_prepared(prep: Prepared, method: str, **params) -> Segmentation:
     p = {**DEFAULTS, **params}
     rbc_labels, info = split_rbc(prep, method, **p)
+    return compose(prep, rbc_labels, info, p["min_region_area"])
+
+
+def compose(prep: Prepared, rbc_labels: np.ndarray, info: dict, min_region_area: int) -> Segmentation:
+    """Merge split RBC labels with the WBC and platelet regions into one labelled image."""
     sizes = np.bincount(rbc_labels.ravel())
-    keep = sizes >= p["min_region_area"]
+    keep = sizes >= min_region_area
     keep[0] = False
     remap = np.zeros(len(sizes), np.int32)
     remap[keep] = np.arange(1, int(keep.sum()) + 1)

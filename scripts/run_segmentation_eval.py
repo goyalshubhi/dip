@@ -1,10 +1,12 @@
 """Segmentation pipeline: training-set radius, tuning on train/val, final test evaluation.
 
-Usage: python scripts/run_segmentation_eval.py [--steps radius,tune,test] [--jobs N]
+Usage: python scripts/run_segmentation_eval.py [--steps design,radius,tune,test,sensitivity] [--jobs N] [--reuse]
+Each step logs to results/logs/seg_<step>.log.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -16,6 +18,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
+from src import evaluate as E
 from src import segment as S
 from src.loader import load_image
 from src.utils import TABLE_DIR, Timer, assert_not_test, get_logger, load_splits, set_seed
@@ -122,19 +125,240 @@ def step_design(splits: dict, jobs: int, logger) -> None:
     logger.info("Design checks (train):\n%s", table.to_string(index=False))
 
 
+# Grids were widened until every optimum was interior, then trimmed to the region around the
+# optima to keep the full pipeline near 30 min (DECISIONS.md, Phase 3).
+SHARED_GRID = {
+    "wbc_dilate": [9, 12, 15, 18, 21],
+    "plt_min_area": [160, 200, 250, 300, 400],
+    "plt_dilate": [5, 7, 9, 11],
+    "rbc_min_area": [1500, 2000, 3000, 4000, 5000],
+}
+FIXED_GRID = [16, 20, 24, 28, 32, 36, 40, 48]
+K1_GRID = [0.5, 0.6, 0.7, 0.8, 1.0]
+K2_GRID = [0.0, 0.01, 0.025, 0.05, 0.1, 0.2]   # k2 = 0 switches the h-dome test off
+PARAMS_PATH = TABLE_DIR / "seg_params.json"
+SHARED_TABLE = TABLE_DIR / "seg_tuning_shared.csv"
+SPLIT_TABLE = TABLE_DIR / "seg_tuning_splitting.csv"
+
+
+def params_tag(params: dict) -> str:
+    """Short hash of the parameters a tuning row was computed with."""
+    blob = json.dumps({k: params[k] for k in sorted(params)}, sort_keys=True, default=str)
+    return hashlib.sha1(blob.encode()).hexdigest()[:12]
+
+
+def _grid_table(fn, keys: list[str], wanted: pd.DataFrame, path: Path, reuse: bool, splits: dict,
+                df: pd.DataFrame, jobs: int, make_args, tag: str, logger) -> pd.DataFrame:
+    """Train/val TP/FP/FN/P/R/F1 per config. With reuse, rows already in `path` that were computed
+    with the same parameters (same tag) are kept and only missing configs are computed; the
+    results are deterministic, so this equals a full run."""
+    old = None
+    if reuse and path.exists():
+        old = pd.read_csv(path, dtype={k: str for k in keys})
+        old = old[old["params_tag"].astype(str) == tag] if "params_tag" in old else old.iloc[:0]
+    todo = wanted if old is None else wanted.merge(old[keys], on=keys, how="left", indicator=True).query(
+        "_merge == 'left_only'")[keys]
+    logger.info("%s: %d configs wanted, %d to compute", path.name, len(wanted), len(todo))
+    parts = {}
+    for name in ("train", "val"):
+        if len(todo):
+            rows = Parallel(n_jobs=jobs)(delayed(fn)(i, df[df["image"] == i], *make_args(todo))
+                                         for i in splits[name])
+            parts[name] = E.aggregate_grid(pd.DataFrame([r for chunk in rows for r in chunk]), keys)
+    new = parts["train"].merge(parts["val"], on=keys, suffixes=("_train", "_val")).assign(params_tag=tag) if parts else None
+    table = pd.concat([t for t in (old, new) if t is not None], ignore_index=True)
+    for k in keys:
+        table[k] = table[k].astype(str)
+    table = wanted.astype(str).merge(table, on=keys, how="left")
+    assert table["f1_train"].notna().all()
+    table.to_csv(path, index=False)
+    return table
+
+
+def step_tune(splits: dict, jobs: int, logger, reuse: bool = False) -> dict:
+    """Stage A: shared stain-path/area parameters (class-specific F1). Stage B: min_distance and
+    (k1, k2) by overall F1 at IoU 0.5. Selection uses train only; val is reported as a check."""
+    train, val = splits["train"], splits["val"]
+    assert_not_test(train + val, "step_tune")
+    df = pd.read_csv(TABLE_DIR / "annotations_clean.csv")
+    with open(S.TRAIN_RADIUS_PATH, encoding="utf-8") as f:
+        fallback_r = json.load(f)["fallback_r"]
+    base = {**S.DEFAULTS, "fallback_r": fallback_r}
+    timer = Timer()
+
+    # Stage A
+    configs = E.shared_configs(SHARED_GRID)
+    keys = ["param", "value", "class"]
+    wanted = pd.DataFrame([(c[0], c[1], c[4]) for c in configs], columns=keys)
+    by_key = {(c[0], c[1], c[4]): c for c in configs}
+
+    def stage_a_args(todo):
+        return ([by_key[tuple(r)] for r in todo.itertuples(index=False)], base)
+
+    shared = _grid_table(E.stain_path_grid_one, keys, wanted, SHARED_TABLE, reuse, splits, df, jobs,
+                         stage_a_args, params_tag(base), logger)
+    chosen = {}
+    for param, g in shared.groupby("param", sort=False):
+        best = g.loc[g["f1_train"].idxmax()]
+        for name, v in zip(param.split(","), str(best["value"]).split(",")):
+            chosen[name] = int(float(v))
+        logger.info("Stage A %s -> %s (train F1 %.3f, val F1 %.3f)", param, best["value"], best["f1_train"], best["f1_val"])
+    params = {**base, **chosen}
+    logger.info("Stage A done in %.0f s", timer.elapsed())
+
+    # Stage B
+    keys = ["method", "config"]
+    wanted = pd.DataFrame(E.splitting_configs(FIXED_GRID, K1_GRID, K2_GRID), columns=keys)
+    split_tab = _grid_table(E.splitting_grid_one, keys, wanted, SPLIT_TABLE, reuse, splits, df, jobs,
+                            lambda todo: (params, list(todo.itertuples(index=False, name=None))),
+                            params_tag(params), logger)
+    for method, g in split_tab.groupby("method", sort=False):
+        best = g.loc[g["f1_train"].idxmax()]
+        for item in best["config"].split(","):
+            name, v = item.split("=")
+            params[name] = int(v) if name == "min_distance" else float(v)
+        logger.info("Stage B %s -> %s (train F1 %.3f, val F1 %.3f)", method, best["config"], best["f1_train"], best["f1_val"])
+    logger.info("Stage B done in %.0f s", timer.elapsed())
+
+    # Validation scores of all four tuned methods pick the method used end-to-end in Phase 4.
+    val_rows = []
+    for method in S.METHODS:
+        per_image = pd.DataFrame(Parallel(n_jobs=jobs)(
+            delayed(_eval_one)(i, df[df["image"] == i], method, params) for i in val))
+        val_rows.append({"method": method, **E.summarize(per_image)})
+    val_tab = pd.DataFrame(val_rows)
+    val_tab.to_csv(TABLE_DIR / "segmentation_val.csv", index=False)
+    best_method = val_tab.loc[val_tab["f1@0.5"].idxmax(), "method"]
+    logger.info("Validation (tuned params):\n%s", val_tab.round(3).to_string(index=False))
+    out = {"params": dict(params), "best_method_by_val_f1@0.5": best_method,
+           "selected_on": "train F1@0.5 (val reported as a check)"}
+    with open(PARAMS_PATH, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
+    logger.info("Saved %s; best method on val: %s; tuning took %.0f s", PARAMS_PATH.name, best_method, timer.elapsed())
+    return out
+
+
+def _eval_one(image_id: str, gt: pd.DataFrame, method: str, params: dict) -> dict:
+    seg = S.segment(load_image(image_id), method, **params)
+    return {"image": image_id, "method": method, **E.evaluate_image(seg, gt),
+            **({"r": seg.info["r"], "r_source": seg.info["r_source"]} if "r" in seg.info else {})}
+
+
+def step_test(splits: dict, jobs: int, logger) -> None:
+    """Final numbers: each tuned method runs once on the test split."""
+    with open(PARAMS_PATH, encoding="utf-8") as f:
+        params = json.load(f)["params"]
+    df = pd.read_csv(TABLE_DIR / "annotations_clean.csv")
+    test = splits["test"]
+    timer = Timer()
+    per_image, rows = [], []
+    for method in S.METHODS:
+        res = pd.DataFrame(Parallel(n_jobs=jobs)(
+            delayed(_eval_one)(i, df[df["image"] == i], method, params) for i in test))
+        per_image.append(res)
+        rows.append({"method": method, **E.summarize(res)})
+    per_image = pd.concat(per_image, ignore_index=True)
+    per_image.to_csv(TABLE_DIR / "segmentation_test_per_image.csv", index=False)
+    table = pd.DataFrame(rows)
+    assert (table["images"] == len(test)).all()
+    table.to_csv(TABLE_DIR / "segmentation_comparison.csv", index=False)
+    logger.info("Test segmentation comparison (%d images; precision is a lower bound, BCCD under-annotates "
+                "RBCs):\n%s", len(test), table.round(3).T.to_string())
+    logger.info("step_test done in %.0f s", timer.elapsed())
+
+
+SENSITIVITY_CONDITIONS = {
+    "original": ("scale", 1.0),
+    "scale_0.7": ("scale", 0.7),
+    "scale_1.3": ("scale", 1.3),
+    "hue_-10deg": ("hue", -10),
+    "hue_+10deg": ("hue", 10),
+    "brightness_0.8": ("brightness", 0.8),
+    "brightness_1.2": ("brightness", 1.2),
+}
+
+
+def perturb(rgb: np.ndarray, gt: pd.DataFrame, kind: str, value: float) -> tuple[np.ndarray, pd.DataFrame]:
+    """Apply one perturbation to an image and (for rescaling) its GT boxes."""
+    gt = gt.copy()
+    if kind == "scale":
+        if value == 1.0:
+            return rgb, gt
+        h, w = rgb.shape[:2]
+        new_w, new_h = int(round(w * value)), int(round(h * value))
+        interp = cv2.INTER_AREA if value < 1 else cv2.INTER_LINEAR
+        out = cv2.resize(rgb, (new_w, new_h), interpolation=interp)
+        sx, sy = new_w / w, new_h / h
+        for c, s, lim in (("xmin", sx, new_w), ("xmax", sx, new_w), ("ymin", sy, new_h), ("ymax", sy, new_h)):
+            # pixel centres map as (i + 0.5) * s - 0.5
+            gt[c] = np.clip(np.round((gt[c] + 0.5) * s - 0.5), 0, lim - 1).astype(int)
+        return out, gt
+    if kind == "hue":
+        hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
+        hsv[..., 0] = ((hsv[..., 0].astype(int) + int(round(value / 2))) % 180).astype(np.uint8)  # OpenCV hue = deg / 2
+        return cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB), gt
+    if kind == "brightness":
+        return np.clip(rgb.astype(np.float32) * value, 0, 255).astype(np.uint8), gt
+    raise ValueError(kind)
+
+
+def _sensitivity_one(image_id: str, gt: pd.DataFrame, params: dict) -> list[dict]:
+    rgb = load_image(image_id)
+    rows = []
+    for cond, (kind, value) in SENSITIVITY_CONDITIONS.items():
+        img, boxes = perturb(rgb, gt, kind, value)
+        prep = S.prepare(img, **params)
+        for method in ("watershed_fixed", "watershed_adaptive"):
+            seg = S.segment_prepared(prep, method, **params)
+            rows.append({"image": image_id, "condition": cond, "kind": kind, "value": value, "method": method,
+                         **E.evaluate_image(seg, boxes),
+                         **({"r": seg.info["r"], "r_source": seg.info["r_source"]} if "r" in seg.info else {})})
+    return rows
+
+
+def step_sensitivity(splits: dict, jobs: int, logger) -> None:
+    """Evaluation D: adaptive vs fixed watershed on perturbed test images (same tuned parameters)."""
+    with open(PARAMS_PATH, encoding="utf-8") as f:
+        params = json.load(f)["params"]
+    df = pd.read_csv(TABLE_DIR / "annotations_clean.csv")
+    test = splits["test"]
+    timer = Timer()
+    res = Parallel(n_jobs=jobs)(delayed(_sensitivity_one)(i, df[df["image"] == i], params) for i in test)
+    per_image = pd.DataFrame([r for chunk in res for r in chunk])
+    per_image.to_csv(TABLE_DIR / "sensitivity_per_image.csv", index=False)
+    rows = []
+    for (cond, method), g in per_image.groupby(["condition", "method"], sort=False):
+        extra = {}
+        if method == "watershed_adaptive":
+            extra = {"r_median": float(g["r"].median()),
+                     "share_r_from_image": float((g["r_source"] == "image").mean())}
+        rows.append({"condition": cond, "kind": g["kind"].iloc[0], "value": g["value"].iloc[0], "method": method,
+                     **E.summarize(g), **extra})
+    table = pd.DataFrame(rows)
+    table.to_csv(TABLE_DIR / "sensitivity.csv", index=False)
+    cols = ["condition", "method", "precision@0.5", "recall@0.5", "f1@0.5", "f1@0.3", "count_mae_RBC",
+            "count_mae_overall", "r_median", "share_r_from_image"]
+    logger.info("Sensitivity on %d test images (precision is a lower bound):\n%s", len(test),
+                table[cols].round(3).to_string(index=False))
+    logger.info("step_sensitivity done in %.0f s", timer.elapsed())
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--steps", default="design,radius,tune,test")
-    parser.add_argument("--jobs", type=int, default=-1)
+    parser.add_argument("--steps", default="design,radius,tune,test,sensitivity")
+    parser.add_argument("--jobs", type=int, default=4, help="worker processes (each needs ~250 MB)")
+    parser.add_argument("--reuse", action="store_true", help="tune: keep configs already in the tuning tables")
     args = parser.parse_args()
     set_seed()
-    logger = get_logger("segmentation_eval")
     splits = load_splits()
-    steps = args.steps.split(",")
-    if "design" in steps:
-        step_design(splits, args.jobs, logger)
-    if "radius" in steps:
-        step_radius(splits, args.jobs, logger)
+    steps = {"design": step_design, "radius": step_radius, "tune": step_tune, "test": step_test,
+             "sensitivity": step_sensitivity}
+    for name in args.steps.split(","):
+        logger = get_logger(f"seg_{name}")
+        if name == "tune":
+            step_tune(splits, args.jobs, logger, reuse=args.reuse)
+        else:
+            steps[name](splits, args.jobs, logger)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,25 @@
+{
+ "params": {
+  "close_radius": 3,
+  "hole_close_radius": 7,
+  "open_radius": 3,
+  "rbc_min_area": 4000,
+  "min_region_area": 100,
+  "purple_thr": 20.0,
+  "group_radius": 8,
+  "plt_min_area": 250,
+  "wbc_min_area": 4000,
+  "wbc_dilate": 15,
+  "plt_dilate": 9,
+  "min_distance": 36,
+  "k1": 0.7,
+  "k2": 0.01,
+  "sigma_frac": 0.1,
+  "circ_min": 0.7,
+  "solidity_min": 0.85,
+  "min_isolated": 1,
+  "fallback_r": 41.544189453125
+ },
+ "best_method_by_val_f1@0.5": "watershed_fixed",
+ "selected_on": "train F1@0.5 (val reported as a check)"
+}
