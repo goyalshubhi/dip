@@ -150,8 +150,20 @@
   images get their own radius estimate (the rest use the unscaled training fallback), which
   limits how much the adaptive method can adapt.
 
+## Phase 6 (in progress)
+- `scripts/run_all.sh` (env, data, all steps, figures, tests; `JOBS` sets worker processes),
+  `notebooks/01_explore.ipynb` (all code cells executed without error against the current
+  results), `README.md` (run commands, results copied from `results/tables`, limitations,
+  future work).
+- Every stage has been run with the same scripts and arguments `run_all.sh` uses; the committed
+  results come from those runs.
+- A full end-to-end `run_all.sh` run was stopped twice by Claude Code because the laptop ran low
+  on memory (other applications held most of the 16 GB). Before it was stopped, the loader,
+  design-check and radius stages had regenerated `data/splits.json` and every table in
+  `results/tables/` byte-for-byte identical to the committed versions.
+
 ## Next
-Phase 6: run_all.sh end-to-end timing, notebook, README.
+Complete one uninterrupted `run_all.sh` run (e.g. `JOBS=2`), record its runtime, final commit.
 
 ## Open issues
 - Adaptive vs fixed: no gain on plain BCCD; gain only at 0.7x, limited by the absolute RBC area
@@ -163,5 +175,7 @@ Phase 6: run_all.sh end-to-end timing, notebook, README.
   "two nucleus-sized blobs = two WBCs" rule (seen on test image BloodImage_00253 in
   `segmentation_grid_test.png`). Not fixed, because changing the segmenter after the test
   run would mean evaluating on test twice.
-- A 12-worker tuning run was killed by the OS for low memory; scripts now default to 4 workers.
+- Runs were stopped three times for low system memory (one 12-worker tuning run, two
+  4-worker `run_all.sh` runs); scripts default to 4 workers and `run_all.sh` takes `JOBS`.
+  The end-to-end runtime of `run_all.sh` is therefore not yet measured.
 - Pale-centred RBCs whose rim has a wide gap, or that touch the border, stay ring/C-shaped.

@@ -1,0 +1,7 @@
+14:39:35 INFO Training radius: {'fallback_r': 41.544189453125, 'n_images': 205, 'n_isolated_cells': 432, 'n_images_with_enough_isolated': 148, 'per_image_r_p5_p50_p95': [33.23, 41.26, 47.49]}
+14:40:05 INFO Radius estimator check (train):
+split  scale  images  share_images_with_isolated_cell  isolated_cells_per_image_mean  r_image_median  r_ratio_to_unscaled_median  r_ratio_p10  r_ratio_p90
+train    0.7     205                            0.688                          1.815           28.98                         0.7        0.686        0.738
+train    1.0     205                            0.722                          2.107           41.26                         1.0        1.000        1.000
+train    1.3     205                            0.732                          2.166           53.62                         1.3        1.289        1.319
+14:40:05 INFO step_radius done in 62.2 s

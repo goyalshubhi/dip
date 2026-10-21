@@ -1,0 +1,21 @@
+14:39:03 INFO Design checks (train):
+                       check                  variant   value    n
+  green_median_at_box_centre                Platelets 145.000  209
+ purple_median_at_box_centre                Platelets  43.660  209
+  green_median_at_box_centre                      RBC 170.000 2377
+ purple_median_at_box_centre                      RBC -16.800 2377
+  green_median_at_box_centre                      WBC 110.000  214
+ purple_median_at_box_centre                      WBC  65.430  214
+  green_median_at_box_centre               background 198.000  205
+ purple_median_at_box_centre               background  -3.760  205
+   share_rbc_centres_in_mask                   close3   0.911  205
+     fg_components_per_image                   close3  16.950  205
+   share_rbc_centres_in_mask                   close5   0.931  205
+     fg_components_per_image                   close5  14.890  205
+   share_rbc_centres_in_mask            close3+holes7   0.938  205
+     fg_components_per_image            close3+holes7  16.140  205
+           train_total_count      wbc_regions_default 223.000  205
+           train_total_count                   wbc_gt 214.000  205
+           train_total_count platelet_regions_default 400.000  205
+           train_total_count              platelet_gt 209.000  205
+share_images_wbc_count_exact                  default   0.937  205

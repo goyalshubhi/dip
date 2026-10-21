@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Reproduce every result from a fresh clone: environment, data, tables, figures, tests.
-# Usage: bash scripts/run_all.sh        (set PYTHON=/path/to/python3.11 to choose the interpreter)
+# Usage: bash scripts/run_all.sh
+#   PYTHON=/path/to/python3.11  interpreter used to create .venv
+#   JOBS=4                      worker processes (~250 MB each; lower it if memory is tight)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 PYTHON="${PYTHON:-python3}"
+JOBS="${JOBS:-4}"
 command -v "$PYTHON" >/dev/null 2>&1 || PYTHON=python
 
 if [ ! -d .venv ]; then
@@ -18,8 +21,8 @@ if [ -x .venv/bin/python ]; then VPY=.venv/bin/python; else VPY=.venv/Scripts/py
 start=$(date +%s)
 bash scripts/download_data.sh
 "$VPY" -m src.loader                                   # cleaning, splits, dataset stats, GT overlays
-"$VPY" scripts/run_segmentation_eval.py                # design checks, radius, tuning (train/val), test, sensitivity
-"$VPY" scripts/run_classification.py                   # features, classifiers (both settings), interpretability
+"$VPY" scripts/run_segmentation_eval.py --jobs "$JOBS"  # design checks, radius, tuning (train/val), test, sensitivity
+"$VPY" scripts/run_classification.py --jobs "$JOBS"     # features, classifiers (both settings), interpretability
 "$VPY" scripts/leakage_checks.py                       # sanity checks behind the >99% accuracy
 "$VPY" scripts/make_figures.py                         # all remaining figures
 "$VPY" -m pytest -q tests
