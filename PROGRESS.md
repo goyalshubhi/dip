@@ -5,7 +5,7 @@
 - [x] Phase 2: preprocess + 4 segmenters + visual check
 - [x] Phase 3: matching, tuning on train/val, segmentation eval on test
 - [x] Phase 4: features + classifiers (GT crops, segmented regions)
-- [ ] Phase 5: interpretability + sensitivity + final figures
+- [x] Phase 5: interpretability + sensitivity + final figures
 - [ ] Phase 6: run_all.sh, notebook, README
 
 ## Phase 1 (done)
@@ -112,14 +112,51 @@
   near-duplicate images across splits (max thumbnail correlation 0.637). The coarse 3-class
   task is easy with size + stain colour; no leakage found.
 
+## Phase 5 (done)
+- `scripts/run_classification.py --steps interpret` -> `results/tables/permutation_importance.csv`,
+  `results/tables/class_feature_means.csv`; figures `results/figures/permutation_importance.png`,
+  `results/figures/class_feature_means.png`.
+- Permutation importance (SVM-RBF, GT crops, test split, drop in macro-F1): equivalent_diameter
+  0.0129, mean_B 0.0072, saturation_mean 0.0041, perimeter 0.0039, area 0.0025; shape features
+  circularity, solidity, eccentricity and hue_mean 0.0000.
+- Interpretation: size separates WBCs (z-scored area +2.59, equivalent diameter +2.23) from
+  platelets (equivalent diameter -2.05, area -1.22) with RBCs in between; stain colour
+  separates both from RBCs (mean_B +1.82 WBC / +1.63 platelets, mean_R -1.99 / -1.35,
+  saturation +2.79 / +0.83). Platelets are the most textured (GLCM contrast +2.27,
+  homogeneity -2.54); WBCs have the highest intensity spread (gray_std +2.37, nucleus vs
+  cytoplasm). Roundness features barely differ between classes. Single-feature importances
+  are small because size (area / perimeter / equivalent diameter) and colour (mean_B /
+  saturation / mean_R) come in redundant groups: permuting one leaves its correlates intact.
+  (Sources: `results/tables/class_feature_means.csv`, `results/tables/permutation_importance.csv`.)
+- Sensitivity (`scripts/run_segmentation_eval.py --steps sensitivity` -> `results/tables/sensitivity.csv`,
+  `results/tables/sensitivity_per_image.csv`, `results/tables/sensitivity_area_cutoff_check.csv`,
+  figure `results/figures/sensitivity.png`; 72 test images, precision is a lower bound):
+
+  | condition | fixed F1@0.5 | adaptive F1@0.5 | fixed RBC MAE | adaptive RBC MAE | adaptive: share of images with own r |
+  |---|---|---|---|---|---|
+  | original | 0.649 | 0.644 | 2.514 | 2.597 | 0.639 |
+  | scale 0.7 | 0.482 | 0.512 | 3.889 | 3.417 | 0.389 |
+  | scale 1.3 | 0.639 | 0.640 | 2.958 | 2.736 | 0.653 |
+  | hue -10 deg | 0.655 | 0.656 | 2.444 | 2.458 | 0.667 |
+  | hue +10 deg | 0.650 | 0.646 | 2.569 | 2.597 | 0.625 |
+  | brightness 0.8 | 0.647 | 0.639 | 2.403 | 2.389 | 0.667 |
+  | brightness 1.2 | 0.637 | 0.636 | 2.431 | 2.333 | 0.597 |
+
+  The adaptive watershed wins only when images are shrunk (0.7x: F1 +0.030, RBC MAE -0.472);
+  at 1.3x and under colour shifts the two are within 0.008 F1. Both methods lose much recall
+  at 0.7x because the shared, absolute RBC area cutoff tuned on unscaled images (4000 px)
+  removes small cells: 46.1% of test RBC boxes have an inscribed-ellipse area below it at 0.7x
+  vs 0.4% at 1.0x. The same cutoff gates the isolated-cell filter, so only 38.9% of 0.7x
+  images get their own radius estimate (the rest use the unscaled training fallback), which
+  limits how much the adaptive method can adapt.
+
 ## Next
-Phase 5: permutation importance + per-class feature means, sensitivity (adaptive vs fixed under
-rescaling and colour shifts), final figures.
+Phase 6: run_all.sh end-to-end timing, notebook, README.
 
 ## Open issues
-- On unscaled BCCD the per-image radius estimate barely varies with true cell size
-  (magnification is constant), so adaptive is not expected to beat fixed on plain BCCD;
-  any advantage should show up only under rescaling (Evaluation D).
+- Adaptive vs fixed: no gain on plain BCCD; gain only at 0.7x, limited by the absolute RBC area
+  cutoff (see Phase 5). Making all area cutoffs scale with r is the obvious next step, but it
+  was not done here because it would be designed after seeing test results.
 - With default parameters platelets were over-detected on train (400 predicted vs 209 GT,
   `results/tables/segmentation_design_checks.csv`); tuning raised plt_min_area to 250.
 - An eosinophil with two large nuclear lobes is split into two WBC regions by the

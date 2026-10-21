@@ -179,12 +179,13 @@ def fig_class_means(logger) -> None:
 
     tab = pd.read_csv(TABLE_DIR / "class_feature_means.csv")
     z = tab[tab["stat"] == "z_mean"].set_index("class").drop(columns="stat")
-    fig, ax = plt.subplots(figsize=(14, 3.4))
+    fig, ax = plt.subplots(figsize=(15, 4))
     lim = float(np.abs(z.to_numpy()).max())
     sns.heatmap(z, cmap="RdBu_r", center=0, vmin=-lim, vmax=lim, annot=True, fmt=".1f", ax=ax,
-                cbar_kws={"label": "z-score vs all train+val crops"})
-    ax.set_title("Per-class mean of each feature (train+val GT-box crops, z-scored)")
+                cbar_kws={"label": "z-score"})
+    ax.set_title("Per-class mean of each feature (train+val GT-box crops, z-scored over all crops)")
     ax.set_ylabel("")
+    ax.tick_params(axis="y", labelrotation=0)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "class_feature_means.png", dpi=110)
     plt.close(fig)

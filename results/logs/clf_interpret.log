@@ -1,0 +1,48 @@
+14:30:34 INFO Permutation importance (SVM-RBF, test split, drop in macro-F1, 20 repeats):
+            feature  importance_mean  importance_std   model
+equivalent_diameter           0.0129          0.0046 SVM-RBF
+             mean_B           0.0072          0.0035 SVM-RBF
+    saturation_mean           0.0041          0.0026 SVM-RBF
+          perimeter           0.0039          0.0029 SVM-RBF
+               area           0.0025          0.0025 SVM-RBF
+             mean_R           0.0014          0.0027 SVM-RBF
+             mean_G           0.0011          0.0019 SVM-RBF
+      glcm_contrast           0.0010          0.0013 SVM-RBF
+        glcm_energy           0.0008          0.0012 SVM-RBF
+       aspect_ratio           0.0005          0.0011 SVM-RBF
+           gray_max           0.0004          0.0013 SVM-RBF
+           gray_min           0.0004          0.0010 SVM-RBF
+       edge_density           0.0001          0.0006 SVM-RBF
+        compactness           0.0001          0.0006 SVM-RBF
+   glcm_homogeneity           0.0001          0.0006 SVM-RBF
+           gray_std           0.0000          0.0000 SVM-RBF
+       eccentricity           0.0000          0.0000 SVM-RBF
+        circularity           0.0000          0.0000 SVM-RBF
+           hue_mean           0.0000          0.0000 SVM-RBF
+           solidity           0.0000          0.0000 SVM-RBF
+   glcm_correlation          -0.0005          0.0025 SVM-RBF
+          gray_mean          -0.0019          0.0012 SVM-RBF
+14:30:34 INFO Per-class z-scored feature means (train+val GT crops):
+label                 RBC   WBC  Platelets
+mean_R               0.30 -1.99      -1.35
+mean_G               0.22 -2.22      -0.24
+mean_B              -0.31  1.82       1.63
+gray_mean            0.21 -1.95      -0.36
+gray_std            -0.25  2.37       0.45
+gray_min             0.20 -2.01      -0.20
+gray_max             0.06  0.08      -0.76
+glcm_contrast       -0.29  1.01       2.27
+glcm_correlation    -0.04  0.97      -0.59
+glcm_energy          0.24 -1.50      -1.26
+glcm_homogeneity     0.31 -1.03      -2.54
+area                -0.13  2.59      -1.22
+perimeter           -0.08  2.33      -1.45
+circularity          0.01 -0.92       0.83
+aspect_ratio         0.04 -0.24      -0.17
+compactness         -0.05  1.08      -0.55
+edge_density        -0.10  0.66       0.50
+solidity             0.01 -0.32       0.20
+eccentricity         0.04 -0.33      -0.14
+equivalent_diameter -0.02  2.23      -2.05
+hue_mean             0.05 -0.17      -0.37
+saturation_mean     -0.32  2.79       0.83

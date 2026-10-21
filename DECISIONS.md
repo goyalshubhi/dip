@@ -47,3 +47,9 @@ Format: choice | alternatives | reason.
 - **Setting 2 labels: Hungarian matching of all regions to all GT boxes at IoU >= 0.5; unmatched regions are excluded from classifier training and scoring; end-to-end recall = matched AND correctly classified / all test GT boxes of the class** | classify unmatched regions as "background" | The spec's three classes have no background class; misses and false regions are already measured in Evaluation A.
 - **Extra row: GT-crop models applied to segmented test regions** | omit | Separates the effect of region shape (segmented masks vs box-derived masks) from that of the training data.
 - **Leakage checks added (scripts/leakage_checks.py) because test accuracy exceeded 99%** | accept as is | CLAUDE.md requires it; the checks found no leakage and a depth-2 tree reaches 0.989 accuracy, so the coarse 3-class task is genuinely easy.
+
+## Phase 5: interpretability and sensitivity
+- **Permutation importance for SVM-RBF on GT crops (best CV macro-F1), test split, macro-F1 scoring, 20 repeats** | impurity importance of RandomForest | Model-agnostic and measured on held-out data, as the spec asks.
+- **Per-class feature means z-scored against all train+val GT crops** | raw means | Features have very different units; z-scores make one heatmap readable.
+- **Perturbations: rescale 0.7x / 1.3x (INTER_AREA down, INTER_LINEAR up; GT boxes mapped through pixel centres), hue +-10 deg (HSV), brightness x0.8 / x1.2 (RGB gain)** | larger shifts | Moderate shifts that a different microscope/stain batch could plausibly produce.
+- **No re-tuning under perturbation; shared cutoffs stay in absolute pixels** | scale the area cutoffs with r | The spec's adaptive method scales only min_distance and h; changing that after seeing test results would be test tuning. The consequence (46.1% of test RBC boxes fall under rbc_min_area at 0.7x) is reported in results/tables/sensitivity_area_cutoff_check.csv.

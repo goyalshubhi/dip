@@ -336,6 +336,16 @@ def step_sensitivity(splits: dict, jobs: int, logger) -> None:
                      **E.summarize(g), **extra})
     table = pd.DataFrame(rows)
     table.to_csv(TABLE_DIR / "sensitivity.csv", index=False)
+
+    # The shared RBC area cutoff is in absolute pixels; how many GT RBCs fall under it per scale?
+    rbc = df[df["image"].isin(test) & (df["class"] == "RBC")]
+    ellipse_area = np.pi / 4 * (rbc["xmax"] - rbc["xmin"] + 1) * (rbc["ymax"] - rbc["ymin"] + 1)
+    cutoff_rows = [{"scale": s, "rbc_min_area": params["rbc_min_area"], "test_rbc_boxes": len(rbc),
+                    "share_rbc_box_ellipse_area_below_cutoff": round(float((ellipse_area * s ** 2 < params["rbc_min_area"]).mean()), 3)}
+                   for s in (0.7, 1.0, 1.3)]
+    cutoff = pd.DataFrame(cutoff_rows)
+    cutoff.to_csv(TABLE_DIR / "sensitivity_area_cutoff_check.csv", index=False)
+    logger.info("Test RBC boxes whose inscribed-ellipse area is below rbc_min_area:\n%s", cutoff.to_string(index=False))
     cols = ["condition", "method", "precision@0.5", "recall@0.5", "f1@0.5", "f1@0.3", "count_mae_RBC",
             "count_mae_overall", "r_median", "share_r_from_image"]
     logger.info("Sensitivity on %d test images (precision is a lower bound):\n%s", len(test),
