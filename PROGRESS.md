@@ -4,7 +4,7 @@
 - [x] Phase 1: env, download, loader, stats, box overlays
 - [x] Phase 2: preprocess + 4 segmenters + visual check
 - [x] Phase 3: matching, tuning on train/val, segmentation eval on test
-- [ ] Phase 4: features + classifiers (GT crops, segmented regions)
+- [x] Phase 4: features + classifiers (GT crops, segmented regions)
 - [ ] Phase 5: interpretability + sensitivity + final figures
 - [ ] Phase 6: run_all.sh, notebook, README
 
@@ -73,9 +73,48 @@
   21 GT RBCs) the methods give 2 / 177 / 19 / 19 RBC-like regions; plain over-segments every image.
 - 27 tests pass (`tests/test_loader.py`, `test_segment.py`, `test_match.py`, `test_features.py`).
 
+## Phase 4 (done)
+- `src/features.py`: exactly 22 features (asserted), definitions in `results/tables/feature_list.csv`.
+  GT boxes get a pixel mask from the segmenter's foreground/stain masks.
+- `src/classify.py` + `scripts/run_classification.py --steps features,classify`: GaussianNB, KNN,
+  SVM-RBF, RandomForest in StandardScaler pipelines; GridSearchCV with GroupKFold(5) over
+  train+val images; test used once. Outputs `results/tables/classification_comparison.csv`,
+  `results/tables/confusion_matrices.csv`, `results/tables/classifier_cv_results.csv`,
+  `results/tables/segmented_regions_summary.csv`, `results/figures/confusion_matrices.png`.
+- Samples (`results/logs/clf_features.log`): GT crops 3935 train+val / 944 test; segmented
+  regions (watershed_fixed) matched at IoU 0.5: 2914 train+val / 680 test. No NaN/inf features.
+- Test results (`results/tables/classification_comparison.csv`; e2e recall = matched by a
+  region AND correctly classified, over all test GT boxes of the class):
+
+  | setting | model | CV macro-F1 | test n | accuracy | macro-F1 | recall RBC | recall WBC | recall Platelets | e2e recall RBC | e2e recall WBC | e2e recall Platelets |
+  |---|---|---|---|---|---|---|---|---|---|---|---|
+  | gt_crops | GaussianNB | 0.995 | 944 | 0.997 | 0.990 | 0.999 | 1.000 | 0.971 | - | - | - |
+  | gt_crops | KNN | 0.996 | 944 | 0.998 | 0.993 | 1.000 | 1.000 | 0.971 | - | - | - |
+  | gt_crops | SVM-RBF | 0.997 | 944 | 0.997 | 0.990 | 1.000 | 1.000 | 0.957 | - | - | - |
+  | gt_crops | RandomForest | 0.996 | 944 | 0.999 | 0.995 | 1.000 | 1.000 | 0.986 | - | - | - |
+  | segmented | GaussianNB | 0.993 | 680 | 0.997 | 0.992 | 1.000 | 0.986 | 0.980 | 0.697 | 0.972 | 0.710 |
+  | segmented | KNN | 0.997 | 680 | 0.997 | 0.992 | 1.000 | 0.986 | 0.980 | 0.697 | 0.972 | 0.710 |
+  | segmented | SVM-RBF | 0.998 | 680 | 0.997 | 0.992 | 1.000 | 0.986 | 0.980 | 0.697 | 0.972 | 0.710 |
+  | segmented | RandomForest | 0.998 | 680 | 0.996 | 0.988 | 0.998 | 0.986 | 0.980 | 0.695 | 0.972 | 0.710 |
+  | gt_crops_model_on_segmented | GaussianNB | - | 680 | 0.990 | 0.970 | 0.998 | 0.986 | 0.900 | 0.695 | 0.972 | 0.652 |
+  | gt_crops_model_on_segmented | KNN | - | 680 | 0.985 | 0.961 | 1.000 | 0.971 | 0.840 | 0.697 | 0.958 | 0.609 |
+  | gt_crops_model_on_segmented | SVM-RBF | - | 680 | 0.994 | 0.985 | 1.000 | 0.971 | 0.960 | 0.697 | 0.958 | 0.696 |
+  | gt_crops_model_on_segmented | RandomForest | - | 680 | 0.991 | 0.976 | 1.000 | 0.986 | 0.900 | 0.697 | 0.972 | 0.652 |
+
+- Gap: on matched regions the classifiers are as accurate as on GT crops; the end-to-end loss
+  is almost entirely segmentation (e2e RBC recall about 0.70 vs 1.00 on GT crops). GT-crop
+  models applied to segmented regions lose platelet recall (0.840-0.960), because segmented
+  platelet masks (dilated stain blobs) differ in shape from box-derived masks.
+- Accuracy > 99% triggered leakage checks (`scripts/leakage_checks.py`,
+  `results/tables/leakage_checks.csv`): 0 images shared between train+val and test; CV macro-F1
+  with shuffled labels 0.256 (GT crops) / 0.249 (segmented); a depth-2 decision tree (size +
+  one colour threshold) reaches test accuracy 0.989 / macro-F1 0.973 in both settings; no
+  near-duplicate images across splits (max thumbnail correlation 0.637). The coarse 3-class
+  task is easy with size + stain colour; no leakage found.
+
 ## Next
-Phase 4: 22 features, four classifiers, GT-crop and end-to-end settings
-(`scripts/run_classification.py`, end-to-end with watershed_fixed, the best method on val).
+Phase 5: permutation importance + per-class feature means, sensitivity (adaptive vs fixed under
+rescaling and colour shifts), final figures.
 
 ## Open issues
 - On unscaled BCCD the per-image radius estimate barely varies with true cell size

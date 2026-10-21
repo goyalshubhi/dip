@@ -1,0 +1,40 @@
+14:29:12 INFO gt_crops depth-2 tree:
+|--- perimeter <= 194.22
+|   |--- mean_R <= 191.25
+|   |   |--- class: Platelets
+|   |--- mean_R >  191.25
+|   |   |--- class: RBC
+|--- perimeter >  194.22
+|   |--- saturation_mean <= 58.37
+|   |   |--- class: RBC
+|   |--- saturation_mean >  58.37
+|   |   |--- class: WBC
+
+14:29:19 INFO segmented depth-2 tree:
+|--- perimeter <= 250.14
+|   |--- mean_B <= 174.14
+|   |   |--- class: RBC
+|   |--- mean_B >  174.14
+|   |   |--- class: Platelets
+|--- perimeter >  250.14
+|   |--- gray_std <= 16.11
+|   |   |--- class: RBC
+|   |--- gray_std >  16.11
+|   |   |--- class: WBC
+
+14:29:21 INFO Most similar test/train-val pairs: [('BloodImage_00391', 'BloodImage_00386', 0.637), ('BloodImage_00171', 'BloodImage_00372', 0.613), ('BloodImage_00149', 'BloodImage_00389', 0.595), ('BloodImage_00290', 'BloodImage_00247', 0.566), ('BloodImage_00320', 'BloodImage_00295', 0.551)]
+14:29:21 INFO Leakage checks:
+  setting                                             check  value
+ gt_crops                     images_in_both_train_and_test  0.000
+ gt_crops                  cv_macro_f1_with_shuffled_labels  0.256
+ gt_crops                        majority_class_share_train  0.849
+ gt_crops                         depth2_tree_test_accuracy  0.989
+ gt_crops                         depth2_tree_test_macro_f1  0.973
+segmented                     images_in_both_train_and_test  0.000
+segmented                  cv_macro_f1_with_shuffled_labels  0.249
+segmented                        majority_class_share_train  0.823
+segmented                         depth2_tree_test_accuracy  0.988
+segmented                         depth2_tree_test_macro_f1  0.973
+   images test_images_with_train_val_thumbnail_corr_gt_0.95  0.000
+   images test_images_with_train_val_thumbnail_corr_gt_0.98  0.000
+   images              max_test_to_train_val_thumbnail_corr  0.637

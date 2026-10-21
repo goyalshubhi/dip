@@ -20,6 +20,7 @@ bash scripts/download_data.sh
 "$VPY" -m src.loader                                   # cleaning, splits, dataset stats, GT overlays
 "$VPY" scripts/run_segmentation_eval.py                # design checks, radius, tuning (train/val), test, sensitivity
 "$VPY" scripts/run_classification.py                   # features, classifiers (both settings), interpretability
+"$VPY" scripts/leakage_checks.py                       # sanity checks behind the >99% accuracy
 "$VPY" scripts/make_figures.py                         # all remaining figures
 "$VPY" -m pytest -q tests
 echo "run_all.sh finished in $(( $(date +%s) - start )) s"

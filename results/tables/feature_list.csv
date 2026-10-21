@@ -1,0 +1,23 @@
+feature,definition
+mean_R,mean red value inside the region
+mean_G,mean green value inside the region
+mean_B,mean blue value inside the region
+gray_mean,mean grayscale intensity inside the region
+gray_std,standard deviation of grayscale intensity inside the region
+gray_min,minimum grayscale intensity inside the region
+gray_max,maximum grayscale intensity inside the region
+glcm_contrast,"GLCM contrast (distance 1, 4 angles averaged, 32 levels, region pixels only)"
+glcm_correlation,GLCM correlation (same GLCM)
+glcm_energy,"GLCM energy, sqrt of angular second moment (same GLCM)"
+glcm_homogeneity,GLCM homogeneity / inverse difference moment (same GLCM)
+area,region area in pixels
+perimeter,region perimeter in pixels (skimage 4-connected estimate)
+circularity,4*pi*area / perimeter^2 (1 for a disk)
+aspect_ratio,major / minor axis length of the moment-equivalent ellipse
+compactness,perimeter^2 / area
+edge_density,Canny edge pixels inside the region / region area
+solidity,area / convex hull area
+eccentricity,eccentricity of the moment-equivalent ellipse
+equivalent_diameter,diameter of the disk with the same area
+hue_mean,"circular mean of HSV hue in degrees [0, 360)"
+saturation_mean,mean HSV saturation (0-255) inside the region

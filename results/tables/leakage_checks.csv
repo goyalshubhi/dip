@@ -1,0 +1,14 @@
+setting,check,value
+gt_crops,images_in_both_train_and_test,0.0
+gt_crops,cv_macro_f1_with_shuffled_labels,0.256
+gt_crops,majority_class_share_train,0.849
+gt_crops,depth2_tree_test_accuracy,0.989
+gt_crops,depth2_tree_test_macro_f1,0.973
+segmented,images_in_both_train_and_test,0.0
+segmented,cv_macro_f1_with_shuffled_labels,0.249
+segmented,majority_class_share_train,0.823
+segmented,depth2_tree_test_accuracy,0.988
+segmented,depth2_tree_test_macro_f1,0.973
+images,test_images_with_train_val_thumbnail_corr_gt_0.95,0.0
+images,test_images_with_train_val_thumbnail_corr_gt_0.98,0.0
+images,max_test_to_train_val_thumbnail_corr,0.637

@@ -1,0 +1,24 @@
+14:26:37 INFO gt_crops / GaussianNB: cv macro-F1 0.995, test acc 0.997 macro-F1 0.990 ({'clf__var_smoothing': 0.001})
+14:26:39 INFO gt_crops / KNN: cv macro-F1 0.996, test acc 0.998 macro-F1 0.993 ({'clf__n_neighbors': 3, 'clf__weights': 'uniform'})
+14:26:44 INFO gt_crops / SVM-RBF: cv macro-F1 0.997, test acc 0.997 macro-F1 0.990 ({'clf__C': 1, 'clf__gamma': 'scale'})
+14:27:22 INFO gt_crops / RandomForest: cv macro-F1 0.996, test acc 0.999 macro-F1 0.995 ({'clf__max_depth': None, 'clf__min_samples_leaf': 1, 'clf__n_estimators': 300})
+14:27:23 INFO segmented / GaussianNB: cv macro-F1 0.993, test acc 0.997 macro-F1 0.992 ({'clf__var_smoothing': 0.001})
+14:27:23 INFO segmented / KNN: cv macro-F1 0.997, test acc 0.997 macro-F1 0.992 ({'clf__n_neighbors': 3, 'clf__weights': 'uniform'})
+14:27:27 INFO segmented / SVM-RBF: cv macro-F1 0.998, test acc 0.997 macro-F1 0.992 ({'clf__C': 0.1, 'clf__gamma': 0.03})
+14:27:58 INFO segmented / RandomForest: cv macro-F1 0.998, test acc 0.996 macro-F1 0.988 ({'clf__max_depth': None, 'clf__min_samples_leaf': 5, 'clf__n_estimators': 300})
+14:27:59 INFO Best model by CV macro-F1: {'gt_crops': 'SVM-RBF', 'segmented': 'SVM-RBF'}
+14:27:59 INFO Classification comparison (test):
+                    setting        model  cv_macro_f1  n_train   n  accuracy  macro_precision  macro_recall  macro_f1  recall_RBC  n_RBC  recall_WBC  n_WBC  recall_Platelets  n_Platelets  e2e_recall_RBC  e2e_recall_WBC  e2e_recall_Platelets
+                   gt_crops   GaussianNB        0.995     3935 944     0.997            0.990         0.990     0.990       0.999    804       1.000     71             0.971           69             NaN             NaN                   NaN
+                   gt_crops          KNN        0.996     3935 944     0.998            0.995         0.990     0.993       1.000    804       1.000     71             0.971           69             NaN             NaN                   NaN
+                   gt_crops      SVM-RBF        0.997     3935 944     0.997            0.995         0.986     0.990       1.000    804       1.000     71             0.957           69             NaN             NaN                   NaN
+                   gt_crops RandomForest        0.996     3935 944     0.999            0.995         0.995     0.995       1.000    804       1.000     71             0.986           69             NaN             NaN                   NaN
+                  segmented   GaussianNB        0.993     2914 680     0.997            0.995         0.989     0.992       1.000    560       0.986     70             0.980           50           0.697           0.972                 0.710
+                  segmented          KNN        0.997     2914 680     0.997            0.995         0.989     0.992       1.000    560       0.986     70             0.980           50           0.697           0.972                 0.710
+                  segmented      SVM-RBF        0.998     2914 680     0.997            0.995         0.989     0.992       1.000    560       0.986     70             0.980           50           0.697           0.972                 0.710
+                  segmented RandomForest        0.998     2914 680     0.996            0.988         0.988     0.988       0.998    560       0.986     70             0.980           50           0.695           0.972                 0.710
+gt_crops_model_on_segmented   GaussianNB          NaN     3935 680     0.990            0.980         0.961     0.970       0.998    560       0.986     70             0.900           50           0.695           0.972                 0.652
+gt_crops_model_on_segmented          KNN          NaN     3935 680     0.985            0.990         0.937     0.961       1.000    560       0.971     70             0.840           50           0.697           0.958                 0.609
+gt_crops_model_on_segmented      SVM-RBF          NaN     3935 680     0.994            0.993         0.977     0.985       1.000    560       0.971     70             0.960           50           0.697           0.958                 0.696
+gt_crops_model_on_segmented RandomForest          NaN     3935 680     0.991            0.992         0.962     0.976       1.000    560       0.986     70             0.900           50           0.697           0.972                 0.652
+14:28:14 INFO step_classify done in 105 s

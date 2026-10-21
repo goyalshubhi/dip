@@ -36,3 +36,14 @@ Format: choice | alternatives | reason.
 - **Final grids trimmed to the region around the optima (Stage A 30 configs, Stage B 38)** | full widened grids (61 + 59 configs, 446 s + 1136 s with 4 workers) | CLAUDE.md asks for ~30 min end to end; every optimum of the wide grids lies inside the trimmed grids.
 - **Default 4 worker processes** | all 12 cores | A 12-worker run was killed by the OS for low memory on this laptop (other apps held most of 16 GB).
 - **`--reuse` keeps tuning rows whose parameter hash matches and computes only missing configs** | always recompute | Makes an interrupted tuning run resumable; results are deterministic, so a reused table equals a full run. The rows from the interrupted run were tagged after checking its log (same Stage A picks, unchanged defaults).
+
+## Phase 4: features and classification
+- **GT-crop mask = the connected component of (Otsu foreground OR B - R stain) that covers most of the box's central half** | the whole rectangle | Shape/texture features need a pixel mask; using the segmenter's own masks keeps one feature definition for both settings.
+- **GLCM on region pixels only (outside pixels get a reserved level 0 whose pairs are dropped), 32 levels, distance 1, 4 angles averaged** | GLCM of the full bounding box | The background around a cell would otherwise dominate the texture.
+- **compactness = perimeter^2 / area** (redundant with circularity up to 4*pi) | extent or other variants | Spec lists both; the standard definition is kept and the redundancy noted.
+- **hue_mean is a circular mean** | arithmetic mean of OpenCV hue | Pink/purple hues straddle the 0/360 wrap.
+- **Classifiers tuned with GroupKFold(5) over train + val images (group = image) and refit on them; test used once** | train only | Val was used only for segmentation tuning; more images for CV.
+- **class_weight='balanced' for SVM and RandomForest; none for GaussianNB/KNN** | resampling | Those two estimators do not support class weights; resampling would change the data the GaussianNB replication sees.
+- **Setting 2 labels: Hungarian matching of all regions to all GT boxes at IoU >= 0.5; unmatched regions are excluded from classifier training and scoring; end-to-end recall = matched AND correctly classified / all test GT boxes of the class** | classify unmatched regions as "background" | The spec's three classes have no background class; misses and false regions are already measured in Evaluation A.
+- **Extra row: GT-crop models applied to segmented test regions** | omit | Separates the effect of region shape (segmented masks vs box-derived masks) from that of the training data.
+- **Leakage checks added (scripts/leakage_checks.py) because test accuracy exceeded 99%** | accept as is | CLAUDE.md requires it; the checks found no leakage and a depth-2 tree reaches 0.989 accuracy, so the coarse 3-class task is genuinely easy.

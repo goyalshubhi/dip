@@ -1,0 +1,10 @@
+split,coarse_type,regions,matched_iou0.5
+test,Platelets,78,49
+test,RBC,1173,561
+test,WBC,76,70
+train,Platelets,249,164
+train,RBC,3534,1692
+train,WBC,223,207
+val,Platelets,106,63
+val,RBC,1501,706
+val,WBC,92,82

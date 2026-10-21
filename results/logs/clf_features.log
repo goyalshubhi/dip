@@ -1,0 +1,14 @@
+14:26:12 INFO Segmentation method for setting 2: watershed_fixed
+14:26:12 INFO GT-crop samples: {('test', 'Platelets'): 69, ('test', 'RBC'): 804, ('test', 'WBC'): 71, ('train', 'Platelets'): 209, ('train', 'RBC'): 2377, ('train', 'WBC'): 214, ('val', 'Platelets'): 83, ('val', 'RBC'): 965, ('val', 'WBC'): 87}
+14:26:12 INFO Segmented regions (all, matched at IoU 0.5):
+split coarse_type  regions  matched_iou0.5
+ test   Platelets       78              49
+ test         RBC     1173             561
+ test         WBC       76              70
+train   Platelets      249             164
+train         RBC     3534            1692
+train         WBC      223             207
+  val   Platelets      106              63
+  val         RBC     1501             706
+  val         WBC       92              82
+14:26:12 INFO Features: 22 per sample, no NaN/inf; extraction took 91 s
